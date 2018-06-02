@@ -40,7 +40,7 @@ This is a blocking function, so it waits until a measurement is received from th
 
 If the module is called with socket option,
 ```
-    sds = SDS011(port=port,use_socket=True,socket_portnum=9999)
+sds = SDS011(port=port,use_socket=True,socket_portnum=9999)
 
 ```
 it will open a socket on localhost and the given port which defaults to 9999.
@@ -55,9 +55,17 @@ which outputs timestamp, pm2.5, pm10, device id
 2018-06-02 10:54:14.573174,29.5,61.4,43897
 ```
 
+## database option
+If the module is called with database option,
+```
+sds = SDS011(port=port,use_database=True)
+```
+it will write values to an sqlite database.
+
+
 
 # todo
 
 - [ ] implement a simple gui
 - [X] implement a socket option to distribute values, just like GPSD does
-- [ ] implement a database option for data collection
+- [X] implement a database option for data collection

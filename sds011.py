@@ -1,17 +1,20 @@
-#file: SDS011.py
+#file: sds011.py
 #author: (C) Patrick Menschel  2018
 #purpose: implement python3 interface to dust sensor inovafitness SDS011
 #https://cdn.sparkfun.com/assets/parts/1/2/2/7/5/Laser_Dust_Sensor_Control_Protocol_V1.3.pdf
 
 
 import serial
-import time
+#import time
 import threading
-from queue import Queue,Empty
+from queue import Queue#,Empty
 import struct
 import datetime
-import socket
+
 from collections import OrderedDict
+
+from sockethandler import sockethandler
+from databasehandler import databasehandler
 
 MSG_HEAD = 0xAA
 MSG_CMD_ID = 0xB4
@@ -98,6 +101,7 @@ class SDS011():
     def __init__(self,port,modesel="active",rate=0,devid=0xFFFF,
                 use_socket=False,
                 socket_portnum=9999,
+                use_database=False,
                  ):
         self.ser = serial.Serial(port=port,
                                  baudrate=9600,
@@ -115,6 +119,7 @@ class SDS011():
         self.sleepworkstate = None
         self.datareportingmode = None
         self.serversocket = None
+        self.databasehandler = None
         self.mutex = threading.Lock()
         self.rx_measurement_queue = Queue()
         self.rx_cmd_resp_queue = Queue()
@@ -124,6 +129,8 @@ class SDS011():
         self.probe()
         if use_socket is True:
             self.serversocket = sockethandler(port=socket_portnum)
+        if use_database is True:
+            self.databasehandler = databasehandler()
         
     
     def probe(self):
@@ -238,6 +245,8 @@ class SDS011():
                                             ])
                         if self.serversocket is not None:
                             self.serversocket.queue_tx_message(item=item)
+                        if self.databasehandler is not None:
+                            self.databasehandler.add_measurement(measurement=item)
 
                         self.rx_measurement_queue.put(item=item)
                         
@@ -304,52 +313,13 @@ class SDS011():
             
         
 
-class sockethandler():
- 
-    def __init__(self,port=9999):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.host = "localhost"                           
-        self.port = port
-        self.sock.bind((self.host, self.port))
-        self.sock.listen(5)#up to 5 requests
-        self.txqueue = Queue()
-        self.listeners = []
-        self.connhandler = threading.Thread(target=self.handle_connections)
-        self.connhandler.setDaemon(True)
-        self.connhandler.start()
-        self.pushhandler = threading.Thread(target=self.pushoutmessage)
-        self.pushhandler.setDaemon(True)
-        self.pushhandler.start()
-        #print("init socket handler")
-         
- 
-    def handle_connections(self):
-        #print("handles connections")
-        while True:
-            clientsocket,addr = self.sock.accept()
-            self.listeners.append((clientsocket,addr))
-     
-    def pushoutmessage(self):
-        #print("pushing")
-        while True:
-            outmessage = self.txqueue.get()
-            msg = "{0}\n".format(",".join([str(outmessage.get(x)) for x in outmessage.keys()]))
-            #print(msg)
-            for clientsocket,addr in self.listeners:
-                clientsocket.sendall(msg.encode())
-             
-    def queue_tx_message(self,item):
-        return self.txqueue.put(item=item)
-      
 
-    def __del__(self):
-        #self.sock.shutdown(flag=)
-        self.sock.close()
 
 if __name__ == "__main__":     
     port = "/dev/ttyUSB0"
     #port = "com10"
-    sds = SDS011(port=port,use_socket=True,socket_portnum=9999)
+    #sds = SDS011(port=port,use_socket=True,socket_portnum=9999)
+    sds = SDS011(port=port,use_database=True)
     sds.set_working_period(rate=5)#one measurment every 5 minutes offers decent granularity and at least a few years of lifetime to the sensor
     print(sds)
     import csv
