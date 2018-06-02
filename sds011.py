@@ -10,6 +10,8 @@ import threading
 from queue import Queue,Empty
 import struct
 import datetime
+import socket
+from collections import OrderedDict
 
 MSG_HEAD = 0xAA
 MSG_CMD_ID = 0xB4
@@ -93,7 +95,10 @@ def concat_cmd_msg(cmd,mode="r",options={},devid=None):
 class SDS011():
     
     
-    def __init__(self,port,modesel="active",rate=0,devid=0xFFFF):
+    def __init__(self,port,modesel="active",rate=0,devid=0xFFFF,
+                use_socket=False,
+                socket_portnum=9999,
+                 ):
         self.ser = serial.Serial(port=port,
                                  baudrate=9600,
                                  bytesize=serial.EIGHTBITS,
@@ -109,6 +114,7 @@ class SDS011():
         self.firmware = "unknown"
         self.sleepworkstate = None
         self.datareportingmode = None
+        self.serversocket = None
         self.mutex = threading.Lock()
         self.rx_measurement_queue = Queue()
         self.rx_cmd_resp_queue = Queue()
@@ -116,7 +122,8 @@ class SDS011():
         self.rx_queue_handler.setDaemon(True)
         self.rx_queue_handler.start()
         self.probe()
-        #self.setup(modesel=modesel,rate=rate)
+        if use_socket is True:
+            self.serversocket = sockethandler(port=socket_portnum)
         
     
     def probe(self):
@@ -201,7 +208,7 @@ class SDS011():
     def request(self,cmd,mode="r",options={}):
         msg = concat_cmd_msg(cmd=cmd, mode=mode, options=options, devid=self.devid)
         self.ser.write(msg)
-        resp = self.rx_cmd_resp_queue.get(timeout=5)
+        resp = self.rx_cmd_resp_queue.get(timeout=10)
         resp_cmd = resp.get("msg_cmd")
         if resp_cmd != cmd:
             raise NotImplementedError("waited for cmd {0} but got response to {1}".format(cmd,resp_cmd))
@@ -224,26 +231,32 @@ class SDS011():
                     if msg_type == MSG_TYPE_MEASUREMENT:
                         #data msg
                         pm2_5,pm10 = (x/10 for x in struct.unpack("<HH",msg[2:6]))
+                        item = OrderedDict([("timestamp",timestamp),
+                                            ("pm2.5",pm2_5),
+                                            ("pm10",pm10),
+                                            ("devid",devid),
+                                            ])
+                        if self.serversocket is not None:
+                            self.serversocket.queue_tx_message(item=item)
+
+                        self.rx_measurement_queue.put(item=item)
                         
-                        #print("PM 2.5 {0} PM 10 {1} devid {2:04X}".format(pm2_5,pm10,devid))
-                        self.rx_measurement_queue.put(item={"timestamp":timestamp,
-                                                             "pm2.5":pm2_5,
-                                                             "pm10":pm10,
-                                                             "devid":devid})
                     elif msg_type == MSG_TYPE_CMD_RESP:
                         #cmd response
                         item = {}
                         msg_cmd = msg[2]
-                        item = {"timestamp":timestamp,
-                                "msg_cmd":msg_cmd,
-                                "devid":devid,
-                                }
+                        item = OrderedDict([("timestamp",timestamp),
+                                            ("msg_cmd",msg_cmd),
+                                            ("devid",devid),
+                                            ])
+                                
                         if msg_cmd == CMD_SET_DATA_REPORTING:
                             mode = MODE_OPTS[msg[3]]
                             modesel = DATA_REPORTING_OPTS[msg[4]]
-                            item.update({"mode":mode,
-                                         "modesel":modesel,
-                                         })
+                            item.update(OrderedDict([("mode",mode),
+                                                     ("modesel",modesel),
+                                                     ]))
+                                         
                         
                         elif msg_cmd == CMD_QUERY_DATA:
                             pass#do nothing as this produces a measurement message 
@@ -254,22 +267,22 @@ class SDS011():
                         elif msg_cmd == CMD_SLEEP_WORK:
                             mode = MODE_OPTS[msg[3]]
                             modesel = SLEEP_OPTS[msg[4]]
-                            item.update({"mode":mode,
-                                         "modesel":modesel,
-                                         })
+                            item.update(OrderedDict([("mode",mode),
+                                                     ("modesel",modesel),
+                                                     ]))
                         
                         elif msg_cmd == CMD_WORKING_PERIOD:
                             mode = MODE_OPTS[msg[3]]
                             rate = msg[4]
-                            item.update({"mode":mode,
-                                         "rate":rate,
-                                         })
+                            item.update(OrderedDict([("mode",mode),
+                                                     ("rate",rate),
+                                                     ]))
                             
                         
                         elif msg_cmd == CMD_FIRMWARE_Version:
                             year,month,day = msg[3:6]
-                            item.update({"firmware_date":datetime.date(year+2000,month,day),
-                                         })
+                            item.update(OrderedDict([("firmware_date",datetime.date(year+2000,month,day)),
+                                                     ]))
                         self.rx_cmd_resp_queue.put(item=item)#split by command type
                         
             
@@ -284,14 +297,59 @@ class SDS011():
                                                                                                                  self.sleepworkstate,
                                                                                                                  self.datareportingmode)
         return msg
+
+    def __del__(self):
+        if self.serversocket is not None:
+            self.serversocket.__del__()
             
         
-    
+
+class sockethandler():
+ 
+    def __init__(self,port=9999):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.host = "localhost"                           
+        self.port = port
+        self.sock.bind((self.host, self.port))
+        self.sock.listen(5)#up to 5 requests
+        self.txqueue = Queue()
+        self.listeners = []
+        self.connhandler = threading.Thread(target=self.handle_connections)
+        self.connhandler.setDaemon(True)
+        self.connhandler.start()
+        self.pushhandler = threading.Thread(target=self.pushoutmessage)
+        self.pushhandler.setDaemon(True)
+        self.pushhandler.start()
+        #print("init socket handler")
+         
+ 
+    def handle_connections(self):
+        #print("handles connections")
+        while True:
+            clientsocket,addr = self.sock.accept()
+            self.listeners.append((clientsocket,addr))
+     
+    def pushoutmessage(self):
+        #print("pushing")
+        while True:
+            outmessage = self.txqueue.get()
+            msg = "{0}\n".format(",".join([str(outmessage.get(x)) for x in outmessage.keys()]))
+            #print(msg)
+            for clientsocket,addr in self.listeners:
+                clientsocket.sendall(msg.encode())
+             
+    def queue_tx_message(self,item):
+        return self.txqueue.put(item=item)
+      
+
+    def __del__(self):
+        #self.sock.shutdown(flag=)
+        self.sock.close()
 
 if __name__ == "__main__":     
     port = "/dev/ttyUSB0"
     #port = "com10"
-    sds = SDS011(port=port)
+    sds = SDS011(port=port,use_socket=True,socket_portnum=9999)
     sds.set_working_period(rate=5)#one measurment every 5 minutes offers decent granularity and at least a few years of lifetime to the sensor
     print(sds)
     import csv
@@ -299,7 +357,7 @@ if __name__ == "__main__":
         with open("measurments.csv","w") as csvfile:
             log = csv.writer(csvfile, delimiter=" ",
                        quotechar="|", quoting=csv.QUOTE_MINIMAL)
-            logcols = ["timestamp","pm2.5","pm10"]
+            logcols = ["timestamp","pm2.5","pm10","devid"]
             log.writerow(logcols)
             while True:
                 meas = sds.read_measurement()
@@ -310,3 +368,4 @@ if __name__ == "__main__":
             
     except KeyboardInterrupt:
         sds.sleep()
+        sds.__del__()
