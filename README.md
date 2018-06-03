@@ -64,8 +64,19 @@ it will write values to an sqlite database.
 
 
 
+# basic gui
+
+A simple PyQt5 App is available as a quick hack.
+
+```
+python3 sds011_pyqt5app.py
+```
+
+![SDS011Plot](resources/sds011_plot.png)
+
+
 # todo
 
-- [ ] implement a simple gui
+- [X] implement a simple gui
 - [X] implement a socket option to distribute values, just like GPSD does
 - [X] implement a database option for data collection
