@@ -1,6 +1,6 @@
 import sys
  
-from PyQt5.QtWidgets import QWidget,  QLCDNumber, QVBoxLayout, QApplication, QSizePolicy, QLabel, QGridLayout
+from PyQt5.QtWidgets import QWidget,   QHBoxLayout, QApplication, QSizePolicy, QLabel, QGridLayout, QLineEdit, QPushButton
 from PyQt5.QtCore import QThread, pyqtSignal
  
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -23,40 +23,97 @@ class App(QWidget):
         self.val_updater = measurement_getter()
         self.val_updater.update_event.connect(self.update_vals)
         self.val_updater.start()
+        self.get_sensor_data()
         
  
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
         
-        self.lcdpm25 = QLCDNumber(self)
+        self.pm25 = QLabel()#QLCDNumber(self)
         pm25label = QLabel()
         pm25label.setText("pm 2.5")
         
-        self.lcdpm10 = QLCDNumber(self)
+        self.pm10 = QLabel()#QLCDNumber(self)
         pm10label = QLabel()
         pm10label.setText("pm 10")
         
         grid = QGridLayout()
 #         self.setLayout(grid)
         
+
+        
+        devidlabel = QLabel()
+        devidlabel.setText("Device ID")
+        self.devid = QLabel()
+        firmwarelabel = QLabel()
+        firmwarelabel.setText("Firmware date")
+        self.firmware_date = QLabel()
+        sleepworkstatelabel = QLabel()
+        sleepworkstatelabel.setText("Sleep work state")
+        self.sleepworkstate = QLabel()
+        datareportinglabel = QLabel()
+        datareportinglabel.setText("Data reporting mode")
+        self.datareportingmode = QLabel()
+        ratelabel = QLabel()
+        ratelabel.setText("Rate")       
+        self.rate = QLabel()
+        
+        self.rateedit = QLineEdit()
+        ratebutton = QPushButton()
+        ratebutton.setText("set rate")
+        ratebutton.clicked.connect(self.setRate)   
+
+
         grid.addWidget(pm25label, 0, 0)
-        grid.addWidget(self.lcdpm25, 0, 1)
+        grid.addWidget(self.pm25, 0, 1)
         grid.addWidget(pm10label, 1, 0)
-        grid.addWidget(self.lcdpm10, 1, 1)
+        grid.addWidget(self.pm10, 1, 1)
+
+        grid.addWidget(devidlabel, 2, 0)
+        grid.addWidget(self.devid, 2, 1)
+        grid.addWidget(firmwarelabel, 3, 0)
+        grid.addWidget(self.firmware_date, 3, 1)
+        grid.addWidget(sleepworkstatelabel, 4, 0)
+        grid.addWidget(self.sleepworkstate, 4, 1)
+        grid.addWidget(datareportinglabel, 5, 0)
+        grid.addWidget(self.datareportingmode, 5, 1)
+        grid.addWidget(ratelabel, 6, 0)
+        grid.addWidget(self.rate, 6, 1)
+        grid.addWidget(self.rateedit, 7, 0)
+        grid.addWidget(ratebutton, 7, 1)
         
-        vbox = QVBoxLayout()
-        vbox.addLayout(grid)
+
+        hbox = QHBoxLayout()
+        hbox.addLayout(grid)
         self.plot = PlotCanvas()        
-        vbox.addWidget(self.plot)                
-        self.setLayout(vbox)
+        hbox.addWidget(self.plot)                
+        self.setLayout(hbox)
         self.show()
-        
+
+    def get_sensor_data(self):
+        data = self.val_updater.sds011.get_sensor_data()
+        self.devid.setText("0x{0:X}".format(data.get("devid")))
+        self.firmware_date.setText(str(data.get("firmware_date")))
+        self.sleepworkstate.setText(str(data.get("sleepworkstate")))
+        self.datareportingmode.setText(str(data.get("datareportingmode")))
+        self.rate.setText(str(data.get("rate")))
+        return
+    
+    def setRate(self):
+        rate = int(self.rateedit.text())        
+        self.val_updater.sds011.set_working_period(rate=rate)
+        self.rate.setText(str(rate))
+        return
+
         
     def update_vals(self):
         vals = self.val_updater.meas
-        self.lcdpm25.display("{0:.1f}".format(vals.get("pm2.5")))
-        self.lcdpm10.display("{0:.1f}".format(vals.get("pm10")))
+        #self.lcdpm25.display("{0:.1f}".format(vals.get("pm2.5")))
+        #self.lcdpm10.display("{0:.1f}".format(vals.get("pm10")))
+        
+        self.pm25.setText("{0:.1f}".format(vals.get("pm2.5")))
+        self.pm10.setText("{0:.1f}".format(vals.get("pm10")))
         
         self.plot.update_plot(timestamp=vals.get("timestamp"),pm2_5=vals.get("pm2.5"),pm10=vals.get("pm10"))
         return

@@ -135,17 +135,26 @@ class SDS011():
     
     def probe(self):
         fwdata = self.get_firmware_version()
+        sldata = self.get_sleep_work()
+        drdata = self.get_data_reporting() 
+        wpdata = self.get_working_period()
         with self.mutex:
             self.devid = fwdata.get("devid")
             self.firmware = fwdata.get("firmware_date")
-        
-        sldata = self.get_sleep_work()
-        with self.mutex:
             self.sleepworkstate = sldata.get("modesel")
-        drdata = self.get_data_reporting() 
-        with self.mutex:
             self.datareportingmode = drdata.get("modesel")
+            self.rate = wpdata.get("rate")
         return
+
+    def get_sensor_data(self):
+        with self.mutex:
+            data = {"devid":self.devid,
+                    "firmware_date":self.firmware,
+                    "sleepworkstate":self.sleepworkstate,
+                    "datareportingmode":self.datareportingmode,
+                    "rate":self.rate,
+                    }
+        return data
         
         
     def setup(self,modesel,rate):
