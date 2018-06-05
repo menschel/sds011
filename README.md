@@ -12,6 +12,20 @@ See the [Spec Sheet](https://cdn.sparkfun.com/assets/parts/1/2/2/7/5/Laser_Dust_
 * The sensor usually comes with a chinese CH341 USB2.0 serial adapter which is not a problem for linux systems but for windows and mac as the drivers sometimes are hard to get.
   In case you're planning to use the sensor on windows, get an FTDI USB to 5V-TTL converter cable.
 
+
+# basic gui
+
+A PyQt5 APP provides basic sensor information and a plot function.
+
+```
+python3 sds011_pyqt5app.pyw
+```
+or running the script as executable
+
+![SDS011Plot](resources/sds011_plot.png)
+
+
+
 ## how to use the module
 
 define a serial port usually a "ttyUSB" or a "com" port
@@ -61,22 +75,3 @@ If the module is called with database option,
 sds = SDS011(port=port,use_database=True)
 ```
 it will write values to an sqlite database.
-
-
-
-# basic gui
-
-A simple PyQt5 App is available as a quick hack.
-
-```
-python3 sds011_pyqt5app.py
-```
-
-![SDS011Plot](resources/sds011_plot.png)
-
-
-# todo
-
-- [X] implement a simple gui
-- [X] implement a socket option to distribute values, just like GPSD does
-- [X] implement a database option for data collection

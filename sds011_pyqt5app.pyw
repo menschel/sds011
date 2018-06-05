@@ -1,3 +1,8 @@
+#!/usr/bin/python3
+#file: sds011_pyqt5app.pyw
+#author: (C) Patrick Menschel 2018
+#purpose: a simple gui to play with the sds011 sensor
+
 import sys
  
 from PyQt5.QtWidgets import QWidget,   QHBoxLayout, QApplication, QSizePolicy, QLabel, QGridLayout, QLineEdit, QPushButton
@@ -8,6 +13,8 @@ from matplotlib.figure import Figure
 
 
 from sds011 import SDS011
+
+from datetime import datetime,timedelta
 
  
 class App(QWidget):
@@ -98,10 +105,14 @@ class App(QWidget):
         self.sleepworkstate.setText(str(data.get("sleepworkstate")))
         self.datareportingmode.setText(str(data.get("datareportingmode")))
         self.rate.setText(str(data.get("rate")))
+        self.rateedit.setText(str(data.get("rate")))
         return
     
     def setRate(self):
-        rate = int(self.rateedit.text())        
+        try:
+            rate = int(self.rateedit.text())        
+        except:
+            rate = 5
         self.val_updater.sds011.set_working_period(rate=rate)
         self.rate.setText(str(rate))
         return
@@ -125,8 +136,9 @@ class measurement_getter(QThread):
     def __init__(self):
         super().__init__()    
         port = "/dev/ttyUSB0"
-        self.sds011 = SDS011(port=port)
-        self.sds011.set_working_period(rate=1)
+        #port = "com12"
+        self.sds011 = SDS011(port=port,use_database=True)
+#        self.sds011.set_working_period(rate=5)
         self.meas = {}
         
     def run(self):
@@ -138,7 +150,7 @@ class measurement_getter(QThread):
 
 class PlotCanvas(FigureCanvas):
  
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
+    def __init__(self, parent=None, width=5, height=4, dpi=100, interval=timedelta(hours=1)):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
  
@@ -152,6 +164,7 @@ class PlotCanvas(FigureCanvas):
         self.timestamps = []
         self.pm2_5vals = []
         self.pm10vals = []
+        self.interval = interval
         self.ax = self.figure.add_subplot(111)
         self.ax.set_title('SDS011 Data Plot')
         
@@ -167,6 +180,11 @@ class PlotCanvas(FigureCanvas):
         return
         
     def update_plot(self,timestamp,pm2_5,pm10):
+        if len(self.timestamps)>0:
+            while (timestamp-self.timestamps[0]) > self.interval:
+                self.timestamps.pop(0)
+                self.pm2_5vals.pop(0)
+                self.pm10vals.pop(0)
         self.timestamps.append(timestamp)
         self.pm2_5vals.append(pm2_5)
         self.pm10vals.append(pm10)
