@@ -14,7 +14,9 @@ from matplotlib.figure import Figure
 
 from sds011 import SDS011
 
-from datetime import datetime,timedelta
+from datetime import timedelta
+
+from serial.tools.list_ports import comports
 
  
 class App(QWidget):
@@ -27,11 +29,7 @@ class App(QWidget):
         self.width = 640
         self.height = 400
         self.initUI()
-        self.val_updater = measurement_getter()
-        self.val_updater.update_event.connect(self.update_vals)
-        self.val_updater.start()
-        self.get_sensor_data()
-        
+        self.setup_port()
  
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -72,6 +70,8 @@ class App(QWidget):
         ratebutton.clicked.connect(self.setRate)   
 
 
+        self.portedit = QLineEdit()
+
         grid.addWidget(pm25label, 0, 0)
         grid.addWidget(self.pm25, 0, 1)
         grid.addWidget(pm10label, 1, 0)
@@ -89,7 +89,8 @@ class App(QWidget):
         grid.addWidget(self.rate, 6, 1)
         grid.addWidget(self.rateedit, 7, 0)
         grid.addWidget(ratebutton, 7, 1)
-        
+        grid.addWidget(self.portedit, 8, 0)
+
 
         hbox = QHBoxLayout()
         hbox.addLayout(grid)
@@ -98,6 +99,22 @@ class App(QWidget):
         self.setLayout(hbox)
         self.show()
 
+    def setup_port(self):
+        self.port = None
+        ports = [p for p in comports()]
+        for p in ports:
+            if (0x1A86,0x7523) == (p.vid,p.pid):
+                self.port = p.device
+                break
+        if self.port is None:
+            raise NotImplementedError("Could not determine the port with CH341")
+        self.portedit.setText(self.port)
+        self.val_updater = measurement_getter(self.port)
+        self.val_updater.update_event.connect(self.update_vals)
+        self.val_updater.start()
+        self.get_sensor_data()
+        return
+        
     def get_sensor_data(self):
         data = self.val_updater.sds011.get_sensor_data()
         self.devid.setText("0x{0:X}".format(data.get("devid")))
@@ -133,9 +150,9 @@ class measurement_getter(QThread):
     
     update_event = pyqtSignal()
     
-    def __init__(self):
+    def __init__(self,port="/dev/ttyUSB0"):
         super().__init__()    
-        port = "/dev/ttyUSB0"
+        #port = "/dev/ttyUSB0"
         #port = "com12"
         self.sds011 = SDS011(port=port,use_database=True)
 #        self.sds011.set_working_period(rate=5)
