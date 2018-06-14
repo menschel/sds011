@@ -11,13 +11,14 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-
+import matplotlib.dates as mdates 
 
 from sds011 import SDS011
 
 from datetime import timedelta
 
 from serial.tools.list_ports import comports
+from matplotlib.axis import XAxis
 
 
 class OptionsDialog(QDialog):
@@ -225,7 +226,7 @@ class measurement_getter(QThread):
 
 class PlotCanvas(FigureCanvas):
  
-    def __init__(self, parent=None, width=5, height=4, dpi=100, interval=timedelta(hours=1)):
+    def __init__(self, parent=None, width=5, height=4, dpi=100, interval=timedelta(minutes=10)):
         fig = Figure(figsize=(width, height), dpi=dpi)
         FigureCanvas.__init__(self, fig)
         self.setParent(parent)
@@ -240,17 +241,21 @@ class PlotCanvas(FigureCanvas):
         self.interval = interval
         self.ax = self.figure.add_subplot(111)
         self.ax.set_title('SDS011 Data Plot')
-        
+        self.ax.format_xdata = mdates.DateFormatter("%H:%M:%S")
+        fig.autofmt_xdate()
+        #[t.set_rotation(90) for t in self.ax.axis.get_xticks()]
+        #self.ax.get_xaxis().set_rotation(90)
         self.plot(init_legend=True)
  
  
     def plot(self,init_legend=False):
-        #self.ax.clear()
+#         self.ax.clear()
         if len(self.timestamps) > 2:
-            if (self.timestamps[-1]-self.timestamps[0]) < self.interval:
-                self.ax.set_xlim((self.timestamps[-1]-self.interval,self.timestamps[-1]))
+            mt = max(self.timestamps)
+            self.ax.set_xlim(mt-self.interval,mt)
         self.ax.plot(self.timestamps,self.pm2_5vals, 'r-',label="pm2.5")
         self.ax.plot(self.timestamps,self.pm10vals, 'g-',label="pm10")
+        
         if init_legend is True:#quick hack to counter multiple instances of legend
             self.ax.legend()
         self.draw()
