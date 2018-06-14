@@ -102,6 +102,7 @@ class SDS011():
                 use_socket=False,
                 socket_portnum=9999,
                 use_database=False,
+                db3path="measurements.db3",
                  ):
         self.ser = serial.Serial(port=port,
                                  baudrate=9600,
@@ -130,7 +131,7 @@ class SDS011():
         if use_socket is True:
             self.serversocket = sockethandler(port=socket_portnum)
         if use_database is True:
-            self.databasehandler = databasehandler()
+            self.databasehandler = databasehandler(db3path=db3path)
         
     
     def probe(self):

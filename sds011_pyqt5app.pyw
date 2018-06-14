@@ -5,10 +5,11 @@
 
 import sys
  
-from PyQt5.QtWidgets import QWidget,   QHBoxLayout, QApplication, QSizePolicy, QLabel, QGridLayout, QLineEdit, QPushButton
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QApplication, QSizePolicy, QLabel, QGridLayout, QLineEdit, QPushButton, QRadioButton, QDialog, QDialogButtonBox
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
  
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 
@@ -18,6 +19,47 @@ from datetime import timedelta
 
 from serial.tools.list_ports import comports
 
+
+class OptionsDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.selection = None
+        self.initUI()
+        
+    def initUI(self):
+        self.setWindowTitle("Select Com Port")
+        self.setGeometry(10,10,640,400)
+        layout = QVBoxLayout()
+        ports = [p for p in comports()]
+        for idx,p in enumerate(ports):
+            btn = QRadioButton()
+            btn.setText(p.device)
+            btn.toggled.connect(lambda: self.on_toggle(p.device))
+            layout.addWidget(btn)
+            if idx == 0:
+                #self.selection = p.device
+                btn.toggle()
+        
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,Qt.Horizontal,self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        
+        self.setLayout(layout)
+        self.show()
+            
+        
+    def on_toggle(self,b):
+        self.selection=b
+        return
+            
+    def on_ok(self):
+        print(self.selection)
+        return self.done()
+        #return self.selection
+    def get_selection(self):
+        return (self.selection)
+        
  
 class App(QWidget):
  
@@ -29,6 +71,8 @@ class App(QWidget):
         self.width = 640
         self.height = 400
         self.initUI()
+#         self.port = ComportSelectDialog()
+#         print(self.port)
         self.setup_port()
  
     def initUI(self):
@@ -67,7 +111,11 @@ class App(QWidget):
         self.rateedit = QLineEdit()
         ratebutton = QPushButton()
         ratebutton.setText("set rate")
-        ratebutton.clicked.connect(self.setRate)   
+        ratebutton.clicked.connect(self.setRate)
+        
+        portbutton = QPushButton()
+        portbutton.setText("select port")
+        portbutton.clicked.connect(self.select_port)
 
 
         self.portedit = QLineEdit()
@@ -90,14 +138,24 @@ class App(QWidget):
         grid.addWidget(self.rateedit, 7, 0)
         grid.addWidget(ratebutton, 7, 1)
         grid.addWidget(self.portedit, 8, 0)
+        grid.addWidget(portbutton, 8, 1)
 
 
         hbox = QHBoxLayout()
         hbox.addLayout(grid)
-        self.plot = PlotCanvas()        
+        self.plot = PlotCanvas()
+        #self.toolbar = NavigationToolbar(self.plot, self)        
         hbox.addWidget(self.plot)                
         self.setLayout(hbox)
         self.show()
+        
+        
+    def select_port(self):
+        od = OptionsDialog()
+        if od.exec_():
+            portselect = od.get_selection()
+            print(portselect)
+        return
 
     def setup_port(self):
         self.port = None
@@ -169,8 +227,6 @@ class PlotCanvas(FigureCanvas):
  
     def __init__(self, parent=None, width=5, height=4, dpi=100, interval=timedelta(hours=1)):
         fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
- 
         FigureCanvas.__init__(self, fig)
         self.setParent(parent)
  
@@ -189,6 +245,10 @@ class PlotCanvas(FigureCanvas):
  
  
     def plot(self,init_legend=False):
+        #self.ax.clear()
+        if len(self.timestamps) > 2:
+            if (self.timestamps[-1]-self.timestamps[0]) < self.interval:
+                self.ax.set_xlim((self.timestamps[-1]-self.interval,self.timestamps[-1]))
         self.ax.plot(self.timestamps,self.pm2_5vals, 'r-',label="pm2.5")
         self.ax.plot(self.timestamps,self.pm10vals, 'g-',label="pm10")
         if init_legend is True:#quick hack to counter multiple instances of legend
@@ -197,11 +257,11 @@ class PlotCanvas(FigureCanvas):
         return
         
     def update_plot(self,timestamp,pm2_5,pm10):
-        if len(self.timestamps)>0:
-            while (timestamp-self.timestamps[0]) > self.interval:
-                self.timestamps.pop(0)
-                self.pm2_5vals.pop(0)
-                self.pm10vals.pop(0)
+#         if len(self.timestamps)>0:
+#             while (timestamp-self.timestamps[0]) > self.interval:
+#                 self.timestamps.pop(0)
+#                 self.pm2_5vals.pop(0)
+#                 self.pm10vals.pop(0)
         self.timestamps.append(timestamp)
         self.pm2_5vals.append(pm2_5)
         self.pm10vals.append(pm10)
