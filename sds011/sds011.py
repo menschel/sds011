@@ -13,8 +13,8 @@ import datetime
 
 from collections import OrderedDict
 
-from sds011.sockethandler import sockethandler
-from sds011.databasehandler import databasehandler
+from sds011.utils.sockethandler import sockethandler
+from sds011.utils.databasehandler import databasehandler
 
 MSG_HEAD = 0xAA
 MSG_CMD_ID = 0xB4
@@ -322,30 +322,3 @@ class SDS011():
             self.serversocket.__del__()
             
         
-
-
-
-if __name__ == "__main__":     
-    port = "/dev/ttyUSB0"
-    #port = "com10"
-    #sds = SDS011(port=port,use_socket=True,socket_portnum=9999)
-    sds = SDS011(port=port,use_database=True)
-    sds.set_working_period(rate=5)#one measurment every 5 minutes offers decent granularity and at least a few years of lifetime to the sensor
-    print(sds)
-    import csv
-    try:
-        with open("measurments.csv","w") as csvfile:
-            log = csv.writer(csvfile, delimiter=" ",
-                       quotechar="|", quoting=csv.QUOTE_MINIMAL)
-            logcols = ["timestamp","pm2.5","pm10","devid"]
-            log.writerow(logcols)
-            while True:
-                meas = sds.read_measurement()
-                vals = [str(meas.get(k)) for k in logcols]
-                log.writerow(vals)
-                print(vals)
-            
-            
-    except KeyboardInterrupt:
-        sds.sleep()
-        sds.__del__()
