@@ -18,8 +18,18 @@ from sds011 import SDS011
 from datetime import timedelta
 
 from serial.tools.list_ports import comports
-from matplotlib.axis import XAxis
+#from matplotlib.axis import XAxis
 
+import os
+import pickle
+
+
+default_opts = {"port":"/dev/ttyUSB0",
+                "autolookup_ch341":True,
+                "autoconnect":True,
+                "rate":5,
+                "interval":timedelta(hours=1),
+                }
 
 class OptionsDialog(QDialog):
     def __init__(self):
@@ -59,7 +69,9 @@ class OptionsDialog(QDialog):
         return self.done()
         #return self.selection
     def get_selection(self):
-        return (self.selection)
+        ret = default_opts
+        ret.update({"port":self.selection})
+        return ret
         
  
 class App(QWidget):
@@ -71,25 +83,25 @@ class App(QWidget):
         self.title = "sds011 dust sensor"
         self.width = 640
         self.height = 400
-        self.initUI()
-#         self.port = ComportSelectDialog()
-#         print(self.port)
-        self.setup_port()
+        self.settings = default_opts
+        self.read_settings() 
+        self.initUI()        
+        if self.settings.get("autoconnect") == True:
+            self.setup_port()
  
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
         
-        self.pm25 = QLabel()#QLCDNumber(self)
+        self.pm25 = QLabel()
         pm25label = QLabel()
         pm25label.setText("pm 2.5")
         
-        self.pm10 = QLabel()#QLCDNumber(self)
+        self.pm10 = QLabel()
         pm10label = QLabel()
         pm10label.setText("pm 10")
         
         grid = QGridLayout()
-#         self.setLayout(grid)
         
 
         
@@ -114,9 +126,9 @@ class App(QWidget):
         ratebutton.setText("set rate")
         ratebutton.clicked.connect(self.setRate)
         
-        portbutton = QPushButton()
-        portbutton.setText("select port")
-        portbutton.clicked.connect(self.select_port)
+        optionsbutton = QPushButton()
+        optionsbutton.setText("select Options")
+        optionsbutton.clicked.connect(self.select_options)
 
 
         self.portedit = QLineEdit()
@@ -139,36 +151,39 @@ class App(QWidget):
         grid.addWidget(self.rateedit, 7, 0)
         grid.addWidget(ratebutton, 7, 1)
         grid.addWidget(self.portedit, 8, 0)
-        grid.addWidget(portbutton, 8, 1)
+        grid.addWidget(optionsbutton, 8, 1)
 
 
         hbox = QHBoxLayout()
         hbox.addLayout(grid)
-        self.plot = PlotCanvas()
-        #self.toolbar = NavigationToolbar(self.plot, self)        
-        hbox.addWidget(self.plot)                
+        vbox2 = QVBoxLayout()
+        self.plot = PlotCanvas(interval=self.settings.get("interval"))
+        self.toolbar = NavigationToolbar(self.plot,parent=self)
+        vbox2.addWidget(self.toolbar)
+        vbox2.addWidget(self.plot)
+        hbox.addLayout(vbox2)                
         self.setLayout(hbox)
         self.show()
         
         
-    def select_port(self):
+    def select_options(self):
         od = OptionsDialog()
         if od.exec_():
-            portselect = od.get_selection()
-            print(portselect)
+            self.settings.update(od.get_selection())
+        self.save_settings()
         return
 
     def setup_port(self):
-        self.port = None
-        ports = [p for p in comports()]
-        for p in ports:
-            if (0x1A86,0x7523) == (p.vid,p.pid):
-                self.port = p.device
-                break
-        if self.port is None:
-            raise NotImplementedError("Could not determine the port with CH341")
-        self.portedit.setText(self.port)
-        self.val_updater = measurement_getter(self.port)
+        if (self.settings.get("autolookup_ch341") == True):
+            ports = [p for p in comports()]
+            for p in ports:
+                if (0x1A86,0x7523) == (p.vid,p.pid):
+                    self.settings.update({"port":p.device})
+                    break
+            if self.settings.get("port") is None:
+                raise NotImplementedError("Could not determine the port with CH341")
+        self.portedit.setText(self.settings.get("port"))
+        self.val_updater = measurement_getter(settings=self.settings)
         self.val_updater.update_event.connect(self.update_vals)
         self.val_updater.start()
         self.get_sensor_data()
@@ -189,19 +204,30 @@ class App(QWidget):
             rate = int(self.rateedit.text())        
         except:
             rate = 5
+        self.settings.update({"rate":rate})
         self.val_updater.sds011.set_working_period(rate=rate)
         self.rate.setText(str(rate))
         return
+    
+    def read_settings(self,settingsfile="settings.pkl"):
+        settings = default_opts
+        if os.path.exists(settingsfile):
+            with open(settingsfile,"rb") as f:
+                settings = pickle.load(f)
+            if isinstance(settings,dict):
+                self.settings.update({key:settings.get(key) for key in settings })
+        return
+    
+    def save_settings(self,settingsfile="settings.pkl"):
+        with open(settingsfile,"wb") as f:
+            pickle.dump(f,self.settings)
+        return            
 
         
     def update_vals(self):
-        vals = self.val_updater.meas
-        #self.lcdpm25.display("{0:.1f}".format(vals.get("pm2.5")))
-        #self.lcdpm10.display("{0:.1f}".format(vals.get("pm10")))
-        
-        self.pm25.setText("{0:.1f}".format(vals.get("pm2.5")))
-        self.pm10.setText("{0:.1f}".format(vals.get("pm10")))
-        
+        vals = self.val_updater.meas        
+        self.pm25.setText("{0:.1f} µg/m³".format(vals.get("pm2.5")))
+        self.pm10.setText("{0:.1f} µg/m³".format(vals.get("pm10")))
         self.plot.update_plot(timestamp=vals.get("timestamp"),pm2_5=vals.get("pm2.5"),pm10=vals.get("pm10"))
         return
         
@@ -209,12 +235,10 @@ class measurement_getter(QThread):
     
     update_event = pyqtSignal()
     
-    def __init__(self,port="/dev/ttyUSB0"):
-        super().__init__()    
-        #port = "/dev/ttyUSB0"
-        #port = "com12"
-        self.sds011 = SDS011(port=port,use_database=True)
-#        self.sds011.set_working_period(rate=5)
+    def __init__(self,settings):
+        super().__init__()
+        self.settings = settings
+        self.sds011 = SDS011(port=self.settings.get("port"))
         self.meas = {}
         
     def run(self):
@@ -243,18 +267,15 @@ class PlotCanvas(FigureCanvas):
         self.ax.set_title('SDS011 Data Plot')
         self.ax.format_xdata = mdates.DateFormatter("%H:%M:%S")
         fig.autofmt_xdate()
-        #[t.set_rotation(90) for t in self.ax.axis.get_xticks()]
-        #self.ax.get_xaxis().set_rotation(90)
         self.plot(init_legend=True)
  
  
     def plot(self,init_legend=False):
-#         self.ax.clear()
         if len(self.timestamps) > 2:
             mt = max(self.timestamps)
             self.ax.set_xlim(mt-self.interval,mt)
-        self.ax.plot(self.timestamps,self.pm2_5vals, 'r-',label="pm2.5")
-        self.ax.plot(self.timestamps,self.pm10vals, 'g-',label="pm10")
+        self.ax.plot(self.timestamps,self.pm2_5vals, 'r-',label="pm2.5 µg/m³")
+        self.ax.plot(self.timestamps,self.pm10vals, 'g-',label="pm10 µg/m³")
         
         if init_legend is True:#quick hack to counter multiple instances of legend
             self.ax.legend()
@@ -262,11 +283,6 @@ class PlotCanvas(FigureCanvas):
         return
         
     def update_plot(self,timestamp,pm2_5,pm10):
-#         if len(self.timestamps)>0:
-#             while (timestamp-self.timestamps[0]) > self.interval:
-#                 self.timestamps.pop(0)
-#                 self.pm2_5vals.pop(0)
-#                 self.pm10vals.pop(0)
         self.timestamps.append(timestamp)
         self.pm2_5vals.append(pm2_5)
         self.pm10vals.append(pm10)
