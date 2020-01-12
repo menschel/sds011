@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="sds011",
-    version="0.0.1",
+    version="0.0.2",
     author="Patrick Menschel",
     author_email="menschel.p@posteo.de",
     description="A python 3 interface to a sds011 fine dust sensor",

@@ -13,8 +13,8 @@ import datetime
 
 from collections import OrderedDict
 
-from sds011.utils.sockethandler import sockethandler
-from sds011.utils.databasehandler import databasehandler
+from sds011.sockethandler import sockethandler
+from sds011.databasehandler import databasehandler
 
 MSG_HEAD = 0xAA
 MSG_CMD_ID = 0xB4
