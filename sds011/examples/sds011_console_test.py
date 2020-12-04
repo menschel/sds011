@@ -15,6 +15,7 @@ try:
             meas = sds.read_measurement()
             vals = [str(meas.get(k)) for k in logcols]
             log.writerow(vals)
+            csvfile.flush()
             print(vals)
             
             
