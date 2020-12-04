@@ -11,7 +11,10 @@ See the [Spec Sheet](https://cdn.sparkfun.com/assets/parts/1/2/2/7/5/Laser_Dust_
   Setting the working period to about 5 minutes is a decent choice for granularity and lifetime.
 * The sensor usually comes with a chinese CH341 USB2.0 serial adapter which is not a problem for linux systems but for windows and mac as the drivers sometimes are hard to get.
   In case you're planning to use the sensor on windows, get an FTDI USB to 5V-TTL converter cable.
-
+* The sensor has 2 basic modes of operation "active" and "query".
+  Only "active" mode has been tested. The low level commands for "query" are implemented are untested.
+  In active mode the sensor makes a measurement every working period and sends that measurement.
+  This leads to the behaviour that the sensor does not necessarily start measure after the object is generated. It stays in it's working period.
 
 # basic gui
 

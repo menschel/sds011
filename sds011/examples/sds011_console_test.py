@@ -9,7 +9,7 @@ import csv
 try:
     with open("measurments.csv","w") as csvfile:
         log = csv.writer(csvfile, delimiter=" ",quotechar="|", quoting=csv.QUOTE_MINIMAL)
-        logcols = ["timestamp","pm2.5","pm10","devid"]
+        logcols = ["timestamp","pm2.5","pm10","device_id"]
         log.writerow(logcols)
         while True:
             meas = sds.read_measurement()

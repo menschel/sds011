@@ -105,9 +105,9 @@ class App(QWidget):
         
 
         
-        devidlabel = QLabel()
-        devidlabel.setText("Device ID")
-        self.devid = QLabel()
+        device_id_label = QLabel()
+        device_id_label.setText("Device ID")
+        self.device_id = QLabel()
         firmwarelabel = QLabel()
         firmwarelabel.setText("Firmware date")
         self.firmware_date = QLabel()
@@ -138,8 +138,8 @@ class App(QWidget):
         grid.addWidget(pm10label, 1, 0)
         grid.addWidget(self.pm10, 1, 1)
 
-        grid.addWidget(devidlabel, 2, 0)
-        grid.addWidget(self.devid, 2, 1)
+        grid.addWidget(device_id_label, 2, 0)
+        grid.addWidget(self.device_id, 2, 1)
         grid.addWidget(firmwarelabel, 3, 0)
         grid.addWidget(self.firmware_date, 3, 1)
         grid.addWidget(sleepworkstatelabel, 4, 0)
@@ -191,10 +191,10 @@ class App(QWidget):
         
     def get_sensor_data(self):
         data = self.val_updater.sds011.get_sensor_data()
-        self.devid.setText("0x{0:X}".format(data.get("devid")))
+        self.device_id.setText("0x{0:X}".format(data.get("device_id")))
         self.firmware_date.setText(str(data.get("firmware_date")))
-        self.sleepworkstate.setText(str(data.get("sleepworkstate")))
-        self.datareportingmode.setText(str(data.get("datareportingmode")))
+        self.sleepworkstate.setText(str(data.get("sleep_work_state")))
+        self.datareportingmode.setText(str(data.get("data_reporting_mode")))
         self.rate.setText(str(data.get("rate")))
         self.rateedit.setText(str(data.get("rate")))
         return
@@ -225,10 +225,14 @@ class App(QWidget):
 
         
     def update_vals(self):
-        vals = self.val_updater.meas        
-        self.pm25.setText("{0:.1f} µg/m³".format(vals.get("pm2.5")))
-        self.pm10.setText("{0:.1f} µg/m³".format(vals.get("pm10")))
-        self.plot.update_plot(timestamp=vals.get("timestamp"),pm2_5=vals.get("pm2.5"),pm10=vals.get("pm10"))
+        vals = self.val_updater.meas    
+        if vals:    
+            self.pm25.setText("{0:.1f} µg/m³".format(vals.get("pm2.5")))
+            self.pm10.setText("{0:.1f} µg/m³".format(vals.get("pm10")))
+            self.plot.update_plot(timestamp=vals.get("timestamp"),pm2_5=vals.get("pm2.5"),pm10=vals.get("pm10"))
+        status = self.val_updater.sensor_status
+        if status:
+            self.sleepworkstate.setText(str(status))
         return
         
 class measurement_getter(QThread):
@@ -239,12 +243,16 @@ class measurement_getter(QThread):
         super().__init__()
         self.settings = settings
         self.sds011 = SDS011(port=self.settings.get("port"))
+        self.sensor_status = None
         self.meas = {}
         
     def run(self):
         while True:
-            self.meas = self.sds011.read_measurement()
+            sensor_measurement = self.sds011.read_measurement(timeout=5)
+            self.meas=sensor_measurement
+            self.sensor_status = self.sds011.get_sleep_work_status()
             self.update_event.emit()
+
 
 
 
