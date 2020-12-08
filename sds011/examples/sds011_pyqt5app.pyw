@@ -24,12 +24,14 @@ from serial.tools.list_ports import comports
 import os
 import pickle
 
-default_opts = {"port": "/dev/ttyUSB0",
+DEFAULT_OPTS = {"port": "/dev/ttyUSB0",
                 "autolookup_ch341": True,
                 "autoconnect": True,
                 "rate": 5,
                 "interval": timedelta(hours=1),
                 }
+
+SETTINGS_FILENAME = "settings.pkl"
 
 
 class OptionsDialog(QDialog):
@@ -70,7 +72,7 @@ class OptionsDialog(QDialog):
         # return self.selection
 
     def get_selection(self):
-        ret = default_opts
+        ret = DEFAULT_OPTS
         ret.update({"port": self.selection})
         return ret
 
@@ -84,7 +86,7 @@ class App(QWidget):
         self.title = "sds011 dust sensor"
         self.width = 640
         self.height = 400
-        self.settings = default_opts
+        self.settings = DEFAULT_OPTS
         self.read_settings()
         self.init_user_interface()
         if self.settings.get("autoconnect") is True:
@@ -117,7 +119,7 @@ class App(QWidget):
         datareportinglabel.setText("Data reporting mode")
         self.datareportingmode = QLabel()
         ratelabel = QLabel()
-        ratelabel.setText("Rate")
+        ratelabel.setText("Rate (minutes between measurements)")
         self.rate = QLabel()
 
         self.rateedit = QLineEdit()
@@ -198,7 +200,7 @@ class App(QWidget):
     def setRate(self):
         try:
             rate = int(self.rateedit.text())
-        except:
+        except (TypeError, ValueError):
             rate = 5
         self.settings.update({"rate": rate})
         self.val_updater.sds011.set_working_period(rate=rate)
@@ -206,7 +208,7 @@ class App(QWidget):
         return
 
     def read_settings(self, settingsfile="settings.pkl"):
-        settings = default_opts
+        settings = DEFAULT_OPTS
         if os.path.exists(settingsfile):
             with open(settingsfile, "rb") as f:
                 settings = pickle.load(f)
@@ -216,7 +218,7 @@ class App(QWidget):
 
     def save_settings(self, settingsfile="settings.pkl"):
         with open(settingsfile, "wb") as f:
-            pickle.dump(f, self.settings)
+            pickle.dump(self.settings, f)
         return
 
     def update_vals(self):

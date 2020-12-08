@@ -1,0 +1,5 @@
+pyserial
+
+# GUI example
+PyQt5
+matplotlib

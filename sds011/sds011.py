@@ -30,7 +30,7 @@ CMD_SET_DEVICE_ID = 5
 CMD_SLEEP_WORK = 6
 SLEEP_OPTS = ["sleep", "work"]
 CMD_WORKING_PERIOD = 8
-CMD_FIRMWARE_Version = 7
+CMD_FIRMWARE_VERSION = 7
 
 
 # The protocol has some similarities with early register access protocols,
@@ -222,7 +222,7 @@ class SDS011:
         return self.request(cmd)
 
     def get_firmware_version(self):
-        cmd = CMD_FIRMWARE_Version
+        cmd = CMD_FIRMWARE_VERSION
         return self.request(cmd)
 
     def request(self, cmd, mode="r", options=None):
@@ -300,7 +300,7 @@ class SDS011:
                                                      ("rate", rate),
                                                      ]))
 
-                        elif msg_cmd == CMD_FIRMWARE_Version:
+                        elif msg_cmd == CMD_FIRMWARE_VERSION:
                             year, month, day = msg[3:6]
                             item.update(OrderedDict([("firmware_date", datetime.date(year + 2000, month, day)),
                                                      ]))
