@@ -105,3 +105,6 @@ ENV/
 
 #no databases
 *.db3
+
+#no pickle files
+*.pkl

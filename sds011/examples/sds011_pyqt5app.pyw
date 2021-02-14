@@ -114,18 +114,21 @@ class App(QWidget):
         self.firmware_date = QLabel()
         sleepworkstatelabel = QLabel()
         sleepworkstatelabel.setText("Sleep work state")
+        sleepworkstatelabel.setToolTip("'sleep' (equal to waiting) or 'active'")
         self.sleepworkstate = QLabel()
         datareportinglabel = QLabel()
         datareportinglabel.setText("Data reporting mode")
+        datareportinglabel.setToolTip("'active' by sensor or 'query' by user (tbd)")
         self.datareportingmode = QLabel()
         ratelabel = QLabel()
-        ratelabel.setText("Rate (minutes between measurements)")
+        ratelabel.setText("Rate")
+        ratelabel.setToolTip("Working period of the sensor in minutes")
         self.rate = QLabel()
 
         self.rateedit = QLineEdit()
         ratebutton = QPushButton()
         ratebutton.setText("set rate")
-        ratebutton.clicked.connect(self.setRate)
+        ratebutton.clicked.connect(self.set_rate)
 
         optionsbutton = QPushButton()
         optionsbutton.setText("select Options")
@@ -197,7 +200,7 @@ class App(QWidget):
         self.rateedit.setText(str(data.get("rate")))
         return
 
-    def setRate(self):
+    def set_rate(self):
         try:
             rate = int(self.rateedit.text())
         except (TypeError, ValueError):
