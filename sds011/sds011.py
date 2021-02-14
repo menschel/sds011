@@ -318,11 +318,16 @@ class SDS011:
             return self.rx_measurement_queue.get()
 
     def __str__(self):
-        msg = "SDS011 Device ID: {0:04X}\nFirmware Date: {1}\nSleepWorkState: {2}\nDataReportingMode {3}".format(
+        msg = """
+              SDS011 Device ID: {0:04X}
+              Firmware Date: {1}
+              SleepWorkState: {2}
+              DataReportingMode {3}""".format(
             self.device_id,
             self.firmware,
             self.sleep_work_state,
-            self.data_reporting_mode)
+            self.data_reporting_mode
+        )
         return msg
 
     def __del__(self):
