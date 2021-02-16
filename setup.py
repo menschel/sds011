@@ -12,7 +12,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/menschel/sds011",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude = ['tests',]),
     classifiers=[
         "Development Status :: 5 - Production/Stable", #used for years without any problems
         "Programming Language :: Python :: 3",
